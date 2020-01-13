@@ -68,3 +68,49 @@
 (defmacro with-plan [& form]
   `(with-redefs [i/layered-idx->seq instrument-layered-idx->seq]
      ~@form))
+
+(comment
+  ;; From Dominic Monroe... this preserves order. TODO, compare
+
+  (require '[dorothy.core :as dot])
+  (require '[dorothy.jvm :refer (render save! show!)])
+
+  (defn rank
+    [attrs statements]
+    {:type ::rank
+     :statements (map #'dot/to-ast statements)
+     :attrs attrs})
+
+  (defmethod dot/dot* ::rank
+    [this]
+    (let [{:keys [attrs statements]} this]
+      (str "{\n"
+           (apply
+            str
+            (for [[k v] attrs]
+              (str (#'dot/escape-id k) \= (#'dot/escape-id v) ";\n")))
+           (apply str (interleave
+                       (map dot/dot* statements)
+                       (repeat ";\n")))
+           "} ")))
+
+  (show!
+   (dot/dot
+    (dot/digraph
+     [[:node0 {:label "0"}]
+      [:node1 {:label "1"}]
+      [:node2 {:label "2"}]
+      [:node3 {:label "3"}]
+      [:nodeA {:label "A"}]
+      [:nodeB {:label "B"}]
+      [:nodeC {:label "C"}]
+      [:node0 :> :nodeA]
+      [:node1 :> :nodeB]
+      [:node1 :> :nodeC]
+      [:node3 :> :nodeA]
+      (rank
+       {:rank "same"
+        :rankdir "LR"}
+       [[:node0 :> :node1 :> :node2 :> :node3 {:style "invis"}]])
+      ])))
+  )
