@@ -7,5 +7,6 @@
                  [juxt/crux-core "19.12-1.6.1-alpha"]
                  [juxt/crux-rocksdb "19.12-1.6.1-alpha"]
                  [rhizome "0.2.9"]
-                 [aysylu/loom "1.0.2"]]
+                 [aysylu/loom "1.0.2"]
+                 [dorothy/dorothy "0.0.7"]]
   :profiles {:dev {:dependencies [[ch.qos.logback/logback-classic "1.2.3"]]}})
