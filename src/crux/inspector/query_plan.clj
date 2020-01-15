@@ -2,9 +2,56 @@
   (:require [crux.inspector.instrument :as instr]
             [crux.inspector.trace :as t]
             [crux.index :as i]
-            [loom.graph :as g]
-            [loom.io :as lio]
-            [rhizome.viz :as v]))
+            [dorothy.core :as dot]
+            [dorothy.jvm :refer (save!)]))
+
+(defn rank
+  [attrs statements]
+  {:type ::rank
+   :statements (map #'dot/to-ast statements)
+   :attrs attrs})
+
+(defmethod dot/dot* ::rank
+  [this]
+  (let [{:keys [attrs statements]} this]
+    (str "{\n"
+         (apply
+           str
+           (for [[k v] attrs]
+             (str (#'dot/escape-id k) \= (#'dot/escape-id v) ";\n")))
+         (apply str (interleave
+                      (map dot/dot* statements)
+                      (repeat ";\n")))
+         "} ")))
+(defn rhiz->doro [graph]
+  (let [ranking (mapv (fn [v] (rank {:rank "same" :rankdir "LR"}
+                                    [(conj (vec (butlast (interleave (map hash v) (repeat :>))))
+                                          {:style "invis"})]))
+                      (filter second (vals (select-keys graph ["NAry: "]))))
+        labels (mapv (fn [nm] [(hash nm) {:label nm}]) (keys graph))
+        edges (vec (apply concat (mapv (fn [[k v]] (mapv (fn [node] [(hash k) :> (hash node)]) v)) graph)))]
+    (save! (dot/dot (dot/digraph (concat labels edges ranking))) "out.png" {:format :png})
+    ranking))
+
+#_(show!
+    (dot/dot
+      (dot/digraph
+        [[:node0 {:label "0"}]
+         [:node1 {:label "1"}]
+         [:node2 {:label "2"}]
+         [:node3 {:label "3"}]
+         [:nodeA {:label "A"}]
+         [:nodeB {:label "B"}]
+         [:nodeC {:label "C"}]
+         [:node0 :> :nodeA]
+         [:node1 :> :nodeB]
+         [:node1 :> :nodeC]
+         [:node3 :> :nodeA]
+         #_(rank
+           {:rank "same"
+            :rankdir "LR"}
+           [[:node0 :> :node1 :> :node2 :> :node3 {:style "invis"}]])
+         ])))
 
 (defprotocol Children
   (children [i]))
@@ -36,81 +83,36 @@
   (children [this]
     nil))
 
-(comment
-  (lio/view (-> (g/graph)
-                (g/add-nodes 1 2 3)
-                (g/add-edges [1 2] [1 3 10])))
-
-  (def g
-    {:a [:b :c]
-     :b [:c]
-     :c [:a]})
-
-  (v/view-graph (keys g) g
-                :node->descriptor (fn [n] {:label n}))
-
-  #_(v/view-tree sequential? seq g
-               :node->descriptor (fn [n] {:label (when (number? n) n)})))
-
 (defn loom-instrumenter [g visited i]
   (swap! g assoc (t/index-name i) (mapv t/index-name (children i)))
   i)
 
 (defn instrument-layered-idx->seq [idx]
-  (let [g (atom {})
+  (let [g (atom (array-map))
         f (partial loom-instrumenter g)]
     (let [x (instr/instrumented-layered-idx->seq f idx)]
       (clojure.pprint/pprint @g)
-      (v/view-graph (keys @g) @g
-                    :node->descriptor (fn [n] {:label n}))
+      (rhiz->doro @g)
       x)))
 
 (defmacro with-plan [& form]
   `(with-redefs [i/layered-idx->seq instrument-layered-idx->seq]
      ~@form))
 
-(comment
-  ;; From Dominic Monroe... this preserves order. TODO, compare
+(dot/digraph [["AEV-E: 0002ab610f" {:label "AEV-E: 0002ab610f"}]
+              ["AVE-V: 000292d9a3" {:label "AVE-V: 000292d9a3"}]
+              ["NAry: " {:label "NAry: "}]
+              ["AVE-E: 000292d9a3" {:label "AVE-E: 000292d9a3"}]
+              ["NAry-Constrained: " {:label "NAry-Constrained: "}]
+              ["Binary: [catalog :fare-prefix f]" {:label "Binary: [catalog :fare-prefix f]"}]
+              ["Binary: [discount :reference ref]" {:label "Binary: [discount :reference ref]"}]
+              ["Binary: [discount :fare-prefix f]" {:label "Binary: [discount :fare-prefix f]"}]
+              ["Unary0: discount discount" {:label "Unary0: discount discount"}]
+              ["Unary1: discount catalog" {:label "Unary1: discount catalog"}]
+              ["AEV-V: 000292d9a3" {:label "AEV-V: 000292d9a3"}]
+              ["Unary3: discount catalog" {:label "Unary3: discount catalog"}]
+              ["Unary2: catalog catalog" {:label "Unary2: catalog catalog"}]
+              ["AEV-E: 000292d9a3" {:label "AEV-E: 000292d9a3"}]
+              ["AEV-V: 0002ab610f" {:label "AEV-V: 0002ab610f"}]
+              ["Binary: [catalog :reference ref]" {:label "Binary: [catalog :reference ref]"}]])
 
-  (require '[dorothy.core :as dot])
-  (require '[dorothy.jvm :refer (render save! show!)])
-
-  (defn rank
-    [attrs statements]
-    {:type ::rank
-     :statements (map #'dot/to-ast statements)
-     :attrs attrs})
-
-  (defmethod dot/dot* ::rank
-    [this]
-    (let [{:keys [attrs statements]} this]
-      (str "{\n"
-           (apply
-            str
-            (for [[k v] attrs]
-              (str (#'dot/escape-id k) \= (#'dot/escape-id v) ";\n")))
-           (apply str (interleave
-                       (map dot/dot* statements)
-                       (repeat ";\n")))
-           "} ")))
-
-  (show!
-   (dot/dot
-    (dot/digraph
-     [[:node0 {:label "0"}]
-      [:node1 {:label "1"}]
-      [:node2 {:label "2"}]
-      [:node3 {:label "3"}]
-      [:nodeA {:label "A"}]
-      [:nodeB {:label "B"}]
-      [:nodeC {:label "C"}]
-      [:node0 :> :nodeA]
-      [:node1 :> :nodeB]
-      [:node1 :> :nodeC]
-      [:node3 :> :nodeA]
-      (rank
-       {:rank "same"
-        :rankdir "LR"}
-       [[:node0 :> :node1 :> :node2 :> :node3 {:style "invis"}]])
-      ])))
-  )
