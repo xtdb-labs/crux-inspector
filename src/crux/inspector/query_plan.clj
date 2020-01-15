@@ -23,6 +23,7 @@
                       (map dot/dot* statements)
                       (repeat ";\n")))
          "} ")))
+
 (defn rhiz->doro [graph]
   (let [ranking (mapv (fn [v] (rank {:rank "same" :rankdir "LR"}
                                     [(conj (vec (butlast (interleave (map hash v) (repeat :>))))
@@ -98,21 +99,3 @@
 (defmacro with-plan [& form]
   `(with-redefs [i/layered-idx->seq instrument-layered-idx->seq]
      ~@form))
-
-(dot/digraph [["AEV-E: 0002ab610f" {:label "AEV-E: 0002ab610f"}]
-              ["AVE-V: 000292d9a3" {:label "AVE-V: 000292d9a3"}]
-              ["NAry: " {:label "NAry: "}]
-              ["AVE-E: 000292d9a3" {:label "AVE-E: 000292d9a3"}]
-              ["NAry-Constrained: " {:label "NAry-Constrained: "}]
-              ["Binary: [catalog :fare-prefix f]" {:label "Binary: [catalog :fare-prefix f]"}]
-              ["Binary: [discount :reference ref]" {:label "Binary: [discount :reference ref]"}]
-              ["Binary: [discount :fare-prefix f]" {:label "Binary: [discount :fare-prefix f]"}]
-              ["Unary0: discount discount" {:label "Unary0: discount discount"}]
-              ["Unary1: discount catalog" {:label "Unary1: discount catalog"}]
-              ["AEV-V: 000292d9a3" {:label "AEV-V: 000292d9a3"}]
-              ["Unary3: discount catalog" {:label "Unary3: discount catalog"}]
-              ["Unary2: catalog catalog" {:label "Unary2: catalog catalog"}]
-              ["AEV-E: 000292d9a3" {:label "AEV-E: 000292d9a3"}]
-              ["AEV-V: 0002ab610f" {:label "AEV-V: 0002ab610f"}]
-              ["Binary: [catalog :reference ref]" {:label "Binary: [catalog :reference ref]"}]])
-
